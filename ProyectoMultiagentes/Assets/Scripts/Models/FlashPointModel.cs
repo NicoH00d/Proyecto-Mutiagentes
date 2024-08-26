@@ -93,7 +93,6 @@ class FlashPointModel(Model):
     def initialize_walls_and_doors(self, wall_positions, door_positions):
 
         param wall_positions: {(0, 0): {"N": True, "S": True, "E": False, "O": False}}
-
         param door_positions: {(0, 0): {"N": True, "S": False, "E": False, "O": False}}
 
         for pos, walls in wall_positions.items():
