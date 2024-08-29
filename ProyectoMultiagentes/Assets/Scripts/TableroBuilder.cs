@@ -6,6 +6,8 @@ public class TableroBuilder : MonoBehaviour
     public GameObject cellPrefab;
     public GameObject wallPrefab;
     public GameObject doorPrefab;
+    public GameObject pointInterestPrefab;
+    public GameObject fireMarkerPrefab;  // Prefab para marcadores de fuego
 
     public string fileName = "tablero"; 
     private string[] lines;
@@ -13,11 +15,15 @@ public class TableroBuilder : MonoBehaviour
     // Variables para guardar la última posición calculada
     private Vector3 lastWallPosition;
     private Vector3 lastDoorPosition;
+    private Vector3 lastPointInterestPosition;
+    private Vector3 lastFireMarkerPosition;
 
     void Start()
     {
         CargarArchivo();
         CrearTablero();
+        CrearPuntosDeInteres();
+        CrearMarcadoresDeFuego();
     }
 
     void CargarArchivo()
@@ -47,11 +53,8 @@ public class TableroBuilder : MonoBehaviour
             string[] cells = lines[i].Split(' ');
             for (int j = 0; j < 8; j++)
             {
-                // Instanciar celda en el plano XZ
                 Vector3 cellPosition = new Vector3(j, 0, -i); // Usamos XZ, Y=0
                 GameObject cell = Instantiate(cellPrefab, cellPosition, Quaternion.identity);
-
-                // Leer las paredes
                 string walls = cells[j];
                 CrearParedes(cellPosition, walls);
             }
@@ -71,52 +74,91 @@ public class TableroBuilder : MonoBehaviour
 
     void CrearParedes(Vector3 cellPosition, string walls)
     {
-        // walls es una cadena de 4 dígitos
         if (walls[0] == '1') // Pared atrás (en la posición Z-)
         {
             Vector3 wallPos = cellPosition + new Vector3(0, 0.3f, 0.5f); 
-            Instantiate(wallPrefab, wallPos, Quaternion.Euler(0, 90, 0)); // Rotar 90 grados para que sea horizontal en XZ
-            lastWallPosition = wallPos; // Guardar la posición para visualizar con gizmos
+            Instantiate(wallPrefab, wallPos, Quaternion.Euler(0, 90, 0)); 
+            lastWallPosition = wallPos; 
         }
         if (walls[1] == '1') // Pared derecha (en la posición X+)
         {
             Vector3 wallPos = cellPosition + new Vector3(0.5f, 0.3f, 0); 
-            Instantiate(wallPrefab, wallPos, Quaternion.identity); // Sin rotación, ya que es vertical en XZ
-            lastWallPosition = wallPos; // Guardar la posición para visualizar con gizmos
+            Instantiate(wallPrefab, wallPos, Quaternion.identity); 
+            lastWallPosition = wallPos; 
         }
         if (walls[2] == '1') // Pared adelante (en la posición Z+)
         {
             Vector3 wallPos = cellPosition + new Vector3(0, 0.3f, -0.5f); 
-            Instantiate(wallPrefab, wallPos, Quaternion.Euler(0, 90, 0)); // Rotar 90 grados para que sea horizontal en XZ
-            lastWallPosition = wallPos; // Guardar la posición para visualizar con gizmos
+            Instantiate(wallPrefab, wallPos, Quaternion.Euler(0, 90, 0)); 
+            lastWallPosition = wallPos; 
         }
         if (walls[3] == '1') // Pared izquierda (en la posición X-)
         {
             Vector3 wallPos = cellPosition + new Vector3(-0.5f, 0.3f, 0); 
-            Instantiate(wallPrefab, wallPos, Quaternion.identity); // Sin rotación, ya que es vertical en XZ
-            lastWallPosition = wallPos; // Guardar la posición para visualizar con gizmos
+            Instantiate(wallPrefab, wallPos, Quaternion.identity); 
+            lastWallPosition = wallPos; 
         }
     }
 
     void CrearPuerta(Vector3 pos1, Vector3 pos2)
     {
         Vector3 doorPosition = (pos1 + pos2) / 2;
-
-        // Instanciar la puerta en la posición calculada
+        doorPosition.y = 0.20f;
         Instantiate(doorPrefab, doorPosition, Quaternion.identity);
-        lastDoorPosition = doorPosition; // Guardar la posición para visualizar con gizmos
+        lastDoorPosition = doorPosition; 
     }
 
-    // Visualizar los gizmos para debug
+    void CrearPuntosDeInteres()
+    {
+        for (int i = 6; i < 9; i++)
+        {
+            string[] pointData = lines[i].Split(' ');
+            int r = int.Parse(pointData[0]) - 1;
+            int c = int.Parse(pointData[1]) - 1;
+            char type = pointData[2][0]; 
+            Vector3 pointPosition = new Vector3(c, 0.5f, -r);
+            GameObject pointInterest = Instantiate(pointInterestPrefab, pointPosition, Quaternion.Euler(-90, 0 , -105));
+
+            if (type == 'v')
+            {
+                pointInterest.GetComponent<Renderer>().material.color = Color.red;
+            }
+            else if (type == 'f')
+            {
+                pointInterest.GetComponent<Renderer>().material.color = Color.yellow;
+            }
+
+            lastPointInterestPosition = pointPosition; 
+        }
+    }
+
+    void CrearMarcadoresDeFuego()
+    {
+        for (int i = 9; i < 19; i++) // Marcadores de fuego están en las líneas 10 a 19
+        {
+            string[] fireData = lines[i].Split(' ');
+            int r = int.Parse(fireData[0]) - 1;
+            int c = int.Parse(fireData[1]) - 1;
+
+            Vector3 firePosition = new Vector3(c, 0.5f, -r);
+            GameObject fireMarker = Instantiate(fireMarkerPrefab, firePosition, Quaternion.Euler(-90, 0 , -105));
+
+            lastFireMarkerPosition = firePosition; 
+        }
+    }
+
     void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
-
-        // Dibujar una esfera en la última posición calculada para una pared
         Gizmos.DrawSphere(lastWallPosition, 0.1f);
-
-        // Dibujar una esfera en la última posición calculada para una puerta
+        
         Gizmos.color = Color.blue;
         Gizmos.DrawSphere(lastDoorPosition, 0.1f);
+
+        Gizmos.color = Color.green;
+        Gizmos.DrawSphere(lastPointInterestPosition, 0.1f);
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawSphere(lastFireMarkerPosition, 0.1f);
     }
 }
