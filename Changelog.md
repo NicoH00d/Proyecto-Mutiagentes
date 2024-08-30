@@ -21,3 +21,4 @@
 - Tablero inical para el modelo (28/8/2024).
 - Escenario base 1 (28/8/2024).
 - Modelos Fuego, Punto de interes (29/8/2024).
+- Prefab Bombero, fuego y punto de interes (30/8/2024).
