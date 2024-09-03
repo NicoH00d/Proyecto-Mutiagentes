@@ -140,7 +140,7 @@ public class TableroBuilder : MonoBehaviour
             int r = int.Parse(fireData[0]) - 1;
             int c = int.Parse(fireData[1]) - 1;
 
-            Vector3 firePosition = new Vector3(c, 0.5f, -r);
+            Vector3 firePosition = new Vector3(c, 0.2f, -r);
             GameObject fireMarker = Instantiate(fireMarkerPrefab, firePosition, Quaternion.Euler(-90, 0 , -105));
 
             lastFireMarkerPosition = firePosition; 
