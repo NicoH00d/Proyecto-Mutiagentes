@@ -28,48 +28,90 @@ import json
 from typing import Any, Dict, List, Tuple, Optional
 
 def parse_game_config(file_path):
+    """Parsea la configuración del juego desde un archivo de texto."""
     with open(file_path, 'r') as file:
         lines = file.readlines()
 
-    # Parse the wall matrix
+    # Extraer las 6 primeras líneas que contienen la matriz de paredes
     wall_matrix = [line.strip().split() for line in lines[:6]]
 
-    # Parse the victims
-    victims = []
-    for line in lines[6:9]:
-        x, y, v_type = line.strip().split()
-        victims.append(((int(x), int(y)), v_type == 'v'))
+    # Verificar que la matriz de paredes se ha leído correctamente
+    if not wall_matrix or len(wall_matrix) != 6:
+        raise ValueError("Error: La matriz de paredes no tiene el tamaño correcto.")
 
-    # Parse the fire markers
+    # Extraer las posiciones de los puntos de interés (víctimas y falsas alarmas)
+    victims = []
+    for line in lines[6:9]:  # Las siguientes 3 líneas
+        x, y, v_type = line.strip().split()
+        victims.append(((int(x), int(y)), v_type == 'v'))  # 'v' para víctima verdadera
+
+    # Extraer los marcadores de fuego
     fire_markers = []
-    for line in lines[9:19]:
+    for line in lines[9:19]:  # Las siguientes 10 líneas
         x, y = map(int, line.strip().split())
         fire_markers.append((x, y))
 
-    # Parse the door markers
+    # Extraer los marcadores de las puertas
     door_markers = []
-    for line in lines[19:27]:
+    for line in lines[19:27]:  # Las siguientes 8 líneas
         x1, y1, x2, y2 = map(int, line.strip().split())
         door_markers.append(((x1, y1), (x2, y2)))
 
-    # Parse the entry points
+    # Extraer los puntos de entrada
     entry_points = []
-    for line in lines[27:31]:
+    for line in lines[27:31]:  # Las últimas 4 líneas
         x, y = map(int, line.strip().split())
         entry_points.append((x, y))
 
+    grid_connections = {}
+    for y, row in enumerate(wall_matrix):
+        for x, cell in enumerate(row):
+            cell_position = (x, y)
+            connections = []
+
+            # Pared arriba (primer dígito)
+            if cell[0] == '1' and y > 0:
+                connections.append(((x, y), (x, y - 1), 5))  # Conecta con la celda de arriba
+            # Pared izquierda (segundo dígito)
+            if cell[1] == '1' and x > 0:
+                connections.append(((x, y), (x - 1, y), 5))  # Conecta con la celda de la izquierda
+            # Pared abajo (tercer dígito)
+            if cell[2] == '1' and y < len(wall_matrix) - 1:
+                connections.append(((x, y), (x, y + 1), 5))  # Conecta con la celda de abajo
+            # Pared derecha (cuarto dígito)
+            if cell[3] == '1' and x < len(row) - 1:
+                connections.append(((x, y), (x + 1, y), 5))  # Conecta con la celda de la derecha
+
+            grid_connections[cell_position] = connections
+
     return {
         "wall_matrix": wall_matrix,
+        "grid_connections": grid_connections,
         "victims": victims,
         "fire_markers": fire_markers,
         "door_markers": door_markers,
         "entry_points": entry_points
     }
 
-# Ejemplo de uso
-filename = 'tablero.txt'  # Nombre del archivo de texto
-parsed_data = parse_game_config(filename)
-print(parsed_data)
+# Ejemplo de uso:
+file_path = 'tablero.txt'  # Reemplaza con la ruta de tu archivo de texto
+game_config = parse_game_config(file_path)
+
+# Acceder a los diferentes elementos del diccionario
+wall_matrix = game_config["wall_matrix"]
+grid_connections = game_config["grid_connections"]
+victim_positions = game_config["victims"]
+fire_positions = game_config["fire_markers"]
+door_positions = game_config["door_markers"]
+entry_positions = game_config["entry_points"]
+
+print("Matriz de paredes:", wall_matrix)
+print("Conexiones generadas:", grid_connections)
+print("Posiciones de víctimas:", victim_positions)
+print("Posiciones de fuego:", fire_positions)
+print("Posiciones de puertas:", door_positions)
+print("Puntos de entrada:", entry_positions)
+
 
 class BomberoAgent(Agent):
     def __init__(self, unique_id: int, model: 'FlashPointModel'):
@@ -134,6 +176,18 @@ class BomberoAgent(Agent):
             self.estrategia_quitar_humo()
         elif self.estrategia == 'romper_pared':
             self.estrategia_romper_pared()
+
+    def get_cell_info(self, pos: Tuple[int, int]) -> Dict[str, Any]:
+        """Devuelve información sobre el estado de una celda específica."""
+        cell_info = {
+            "fuego": pos in self.fire_spots,
+            "humo": pos in self.smoke_spots,
+            "punto_interes": self.poi_dict.get(pos, {}).get("is_victim", False),
+            "paredes": self.get_walls_info(pos),
+            "puerta": self.is_doorway(pos)
+        }
+        return cell_info
+
 
     def estrategia_buscar_poi(self):
         poi_posiciones = [(x, y) for x in range(self.model.width)
@@ -488,14 +542,38 @@ def convert_keys_to_str(d):
     else:
         return d
 
+def create_simple_grid_connections(grid_connections):
+    """Crea una lista de conexiones simples en lugar de un diccionario anidado."""
+    simple_connections = []
+    for key, connections in grid_connections.items():
+        # Asegurarse de que 'key' es una lista, no una tupla o cadena
+        if isinstance(key, str):
+            from_pos = list(eval(key))
+        elif isinstance(key, tuple):
+            from_pos = list(key)
+        else:
+            from_pos = key  # En caso de que ya sea una lista
+
+        for conn in connections:
+            simple_connections.append({
+                "from": from_pos,
+                "to": list(conn[0]),
+                "cost": conn[1]
+            })
+    print("Conexiones simples generadas:", simple_connections)  # Verifica las conexiones
+    return simple_connections
+
 # Correr la simulación por 10 pasos
-for step in range(10):
+for step in range(100):
     game_state = model.advance_simulation()
     print(f"Estado del juego en el paso {step + 1}:")
     game_state_json = model.get_simulation_state()
 
     # Imprimir el estado de la simulación en la consola
     print(game_state_json)
+
+    # Crear una estructura de conexiones más simple
+    game_state_json["grid_connections"] = create_simple_grid_connections(game_state_json["grid_connections"])
 
     # Convertir las claves del diccionario a cadenas
     game_state_json_str = json.dumps(convert_keys_to_str(game_state_json))
