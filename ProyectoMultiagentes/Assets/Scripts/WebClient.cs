@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Networking;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 public class WebClient : MonoBehaviour
 {
@@ -13,46 +14,63 @@ public class WebClient : MonoBehaviour
     public GameObject victimPrefab; // Prefab para las víctimas
     public GameObject doorPrefab;
     public GameObject entrancePrefab;
+    public GameObject firefighterPrefab;
+    
 
 
     private Dictionary<Vector3, GameObject> cells = new Dictionary<Vector3, GameObject>();
-    private string previousJson = ""; // Variable para almacenar el JSON anterior
+    private Dictionary<int, GameObject> bomberos = new Dictionary<int, GameObject>(); // Almacenar las instancias de los bomberos
 
+    private string previousJson = ""; // Variable para almacenar el JSON anterior
+    
     IEnumerator SendData()
     {
         string url = "http://127.0.0.1:8585";
-        using (UnityWebRequest www = UnityWebRequest.Get(url))
+    
+        while (true)  // Esto hará que las solicitudes se repitan indefinidamente
         {
-            yield return www.SendWebRequest();
-
-            if (www.result == UnityWebRequest.Result.ConnectionError || www.result == UnityWebRequest.Result.ProtocolError)
+            using (UnityWebRequest www = UnityWebRequest.Get(url))
             {
-                Debug.LogError($"Error: {www.error}, Status Code: {www.responseCode}");
-            }
-            else
-            {
-                string newJson = www.downloadHandler.text;
-                Debug.Log("Received JSON: " + newJson);
-
-                // Verifica si el JSON ha cambiado
-                if (!newJson.Equals(previousJson))
+                yield return www.SendWebRequest();
+    
+                if (www.result == UnityWebRequest.Result.ConnectionError || www.result == UnityWebRequest.Result.ProtocolError)
                 {
-                    // Deserializar el nuevo JSON
-                    var cellDictionary = JsonConvert.DeserializeObject<Dictionary<string, Cell>>(newJson);
-
-                    // Crear el escenario basado en los datos deserializados
-                    CrearEscenario(cellDictionary);
-
-                    // Actualizar el JSON anterior
-                    previousJson = newJson;
+                    Debug.LogError($"Error: {www.error}, Status Code: {www.responseCode}");
                 }
                 else
                 {
-                    Debug.Log("No changes detected in the JSON.");
+                    string newJson = www.downloadHandler.text;
+                    Debug.Log("Received JSON: " + newJson);
+    
+                    // Verifica si el JSON ha cambiado
+                    if (!newJson.Equals(previousJson))
+                    {
+                        // Deserializar el nuevo JSON
+                        var cellDictionary = JsonConvert.DeserializeObject<Dictionary<string, Cell>>(newJson);
+    
+                        // Crear el escenario basado en los datos deserializados
+                        CrearEscenario(cellDictionary);
+    
+                        // Deserializar los datos de los bomberos
+                        JObject jsonObject = JObject.Parse(newJson);
+                        InstanciarBomberos(jsonObject);
+    
+                        // Actualizar el JSON anterior
+                        previousJson = newJson;
+                    }
+                    else
+                    {
+                        Debug.Log("No changes detected in the JSON.");
+                    }
                 }
             }
+    
+            // Esperar un tiempo antes de volver a hacer la solicitud (por ejemplo, cada 1 segundo)
+            yield return new WaitForSeconds(1.0f);
         }
     }
+
+
 
     void CrearEscenario(Dictionary<string, Cell> cellDictionary)
     {
@@ -88,6 +106,34 @@ public class WebClient : MonoBehaviour
             {
                 currentColumn = 0;
                 currentRow++;
+            }
+        }
+    }
+      // Método para instanciar o actualizar bomberos
+    void InstanciarBomberos(JObject jsonObject)
+    {
+        foreach (var firefighter in jsonObject)
+        {
+            if (firefighter.Key.StartsWith("Firefighter_"))
+            {
+                int id = int.Parse(firefighter.Key.Replace("Firefighter_", ""));
+                int x = firefighter.Value["posicion_x"].ToObject<int>();
+                int y = firefighter.Value["posicion_y"].ToObject<int>();
+                bool carryingVictim = firefighter.Value["carrying_victim"].ToObject<bool>();
+
+                Vector3 position = new Vector3(x, 0.45f, y);
+
+                // Si el bombero ya está en la escena, actualiza su posición
+                if (bomberos.ContainsKey(id))
+                {
+                    bomberos[id].transform.position = position;
+                }
+                else
+                {
+                    // Si no existe, crea una nueva instancia del bombero
+                    GameObject newFirefighter = Instantiate(firefighterPrefab, position, Quaternion.Euler(-90,0,0));
+                    bomberos.Add(id, newFirefighter);
+                }
             }
         }
     }
@@ -254,4 +300,24 @@ public class Cell
     public List<List<int>> coordenadas_victimas;
     public List<List<int>> coordenadas_poi;
     public List<List<int>> coordenadas_entradas;
+}
+
+public class Bombero
+{
+    public int posicion_x;
+    public int posicion_y;
+    bool carrying_victim;
+
+    public Bombero(int x, int y, bool carrying)
+    {
+        posicion_x = x;
+        posicion_y = y;
+        carrying_victim = carrying;
+    }
+
+    // Método para obtener la posición como Vector3 (necesario para Unity)
+    public Vector3 GetPosition()
+    {
+        return new Vector3(posicion_x, 0f, posicion_y); // Puedes ajustar la altura Y si es necesario
+    }
 }

@@ -311,6 +311,8 @@ MonoBehaviour:
   poiPrefab: {fileID: 8369474050141732174, guid: 38a9ee181f398f34c8ce34ba2f4d9c14, type: 3}
   victimPrefab: {fileID: 1439572815861100199, guid: 0e2657cdb5ce60e4888efc7208cd5721, type: 3}
   doorPrefab: {fileID: 2449328629850061841, guid: 83b51a749dd55e144a5c2fa68bebe74d, type: 3}
+  entrancePrefab: {fileID: 4420021306392724326, guid: 30838dc2dcd2d474685a2de95c5ce424, type: 3}
+  firefighterPrefab: {fileID: 3188303734698515730, guid: e213ed984144b65409c3abb042690763, type: 3}
 --- !u!4 &291729404
 Transform:
   m_ObjectHideFlags: 0

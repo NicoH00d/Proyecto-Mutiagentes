@@ -532,56 +532,141 @@ if __name__ == "__main__":
     model = FlashPointModel(GRID_WIDTH, GRID_HEIGHT, wall_matrix, victim_positions, initial_fire_positions, door_connections, exit_points)
 
 import json
+import time
 
-def convert_keys_to_str(d):
-    """Convierte las claves del diccionario a cadenas."""
-    if isinstance(d, dict):
-        return {str(k): convert_keys_to_str(v) for k, v in d.items()}
-    elif isinstance(d, list):
-        return [convert_keys_to_str(i) for i in d]
-    else:
-        return d
+class Cell:
+    def __init__(self, x, y, wall):
+        self.pos = (x, y)
+        self.up = wall[0] == '1'
+        self.left = wall[1] == '1'
+        self.down = wall[2] == '1'
+        self.right = wall[3] == '1'
+        self.poi = 0
+        self.fire = 0
+        self.door = []
+        self.entrance = False
 
-def create_simple_grid_connections(grid_connections):
-    """Crea una lista de conexiones simples en lugar de un diccionario anidado."""
-    simple_connections = []
-    for key, connections in grid_connections.items():
-        # Asegurarse de que 'key' es una lista, no una tupla o cadena
-        if isinstance(key, str):
-            from_pos = list(eval(key))
-        elif isinstance(key, tuple):
-            from_pos = list(key)
-        else:
-            from_pos = key  # En caso de que ya sea una lista
+def process_map_file(filename):
+    with open(filename, 'r') as map_file:
+        lines = map_file.read().splitlines()
 
-        for conn in connections:
-            simple_connections.append({
-                "from": from_pos,
-                "to": list(conn[0]),
-                "cost": conn[1]
-            })
-    print("Conexiones simples generadas:", simple_connections)  # Verifica las conexiones
-    return simple_connections
+    walls = []
+    for i in range(6):
+        for j in range(8):
+            walls.append(lines[i][j*4:(j+1)*4])
 
-# Correr la simulación por 10 pasos
-for step in range(100):
-    game_state = model.advance_simulation()
-    print(f"Estado del juego en el paso {step + 1}:")
-    game_state_json = model.get_simulation_state()
+    pois = []
+    for i in range(6, 9):
+        pois.append((int(lines[i][0]), int(lines[i][2]), lines[i][4]))
 
-    # Imprimir el estado de la simulación en la consola
-    print(game_state_json)
+    fires = []
+    for i in range(9, 19):
+        fires.append((int(lines[i][0]), int(lines[i][2])))
 
-    # Crear una estructura de conexiones más simple
-    game_state_json["grid_connections"] = create_simple_grid_connections(game_state_json["grid_connections"])
+    doors = []
+    for i in range(19, 27):
+        doors.append(((int(lines[i][0]), int(lines[i][2])), (int(lines[i][4]), int(lines[i][6]))))
 
-    # Convertir las claves del diccionario a cadenas
-    game_state_json_str = json.dumps(convert_keys_to_str(game_state_json))
+    entrances = []
+    for i in range(27, 31):
+        entrances.append((int(lines[i][0]), int(lines[i][2])))
 
-    # Guardar el estado de la simulación en un archivo JSON
-    with open('simulation_state.json', 'w') as json_file:
-        json_file.write(game_state_json_str)
+    cells = []
+    for i in range(6):
+        for j in range(8):
+            w = walls.pop(0)
+            c = Cell(i + 1, j + 1, w)
+            cells.append(c)
 
-    # Verificar si la simulación debe detenerse
-    if not model.is_running:
-        break
+            if (i + 1, j + 1, 'v') in pois:
+                c.poi = 2
+            elif (i + 1, j + 1, 'f') in pois:
+                c.poi = 1
+
+            if (i + 1, j + 1) in fires:
+                c.fire = 2
+
+            for d in doors:
+                if (i + 1, j + 1) == d[0]:
+                    c.door = d[1]
+
+            if (i + 1, j + 1) in entrances:
+                c.entrance = True
+
+    map_data = {}
+
+    for c in cells:
+        cell_key = f"Cell {c.pos[0]}{c.pos[1]}"
+        
+        if cell_key not in map_data:
+            map_data[cell_key] = {
+                "posicion_x": c.pos[0],
+                "posicion_y": c.pos[1],
+                "muro_arriba": c.up,
+                "muro_izquierda": c.left,
+                "muro_abajo": c.down,
+                "muro_derecha": c.right,
+                "punto_interes": c.poi,
+                "fuego": c.fire,
+                "puerta": c.door,
+                "entrada": c.entrance,
+                "coordenadas_poi": [],
+                "coordenadas_victimas": [],
+                "coordenadas_fuego": [],
+                "coordenadas_entradas": []
+            }
+        
+        if c.poi == 2:  # Víctima
+            map_data[cell_key]["coordenadas_victimas"].append(c.pos)
+        elif c.poi == 1:  # Falsa alarma
+            if map_data[cell_key]["fuego"] == 0 and not map_data[cell_key]["coordenadas_victimas"]:
+                map_data[cell_key]["coordenadas_poi"].append(c.pos)
+        
+        if c.fire == 2:  # Fuego
+            map_data[cell_key]["coordenadas_fuego"].append(c.pos)
+        
+        if c.entrance:
+            map_data[cell_key]["coordenadas_entradas"].append(c.pos)
+    
+    return map_data
+
+def save_json(map_data):
+    # Guarda el JSON en un archivo (sobrescribiendo en cada paso)
+    with open('simulation_state.json', 'w') as outfile:
+        json.dump(map_data, outfile)
+
+def main():
+    # Procesa el archivo del mapa
+    map_data = process_map_file('tablero.txt')
+
+    # Correr la simulación por 100 pasos
+    for step in range(100):
+        game_state = model.advance_simulation()  # Aquí avanza la simulación
+        print(f"Estado del juego en el paso {step + 1}:")
+        
+        # Obtén el estado actual del tablero
+        current_state = model.get_simulation_state()
+
+        # Integra la posición de los bomberos en el mapa
+        for firefighter in current_state['firefighter_positions']:
+            firefighter_id = firefighter['id']
+            position = firefighter['position']
+            carrying_victim = firefighter['carrying_victim']
+            
+            # Agrega las posiciones al JSON del mapa (puedes ajustar según cómo estructures el JSON)
+            map_data[f"Firefighter_{firefighter_id}"] = {
+                "posicion_x": position[0],
+                "posicion_y": position[1],
+                "carrying_victim": carrying_victim
+            }
+
+        # Guarda el estado actualizado de la simulación en formato JSON
+        save_json(map_data)
+
+        # Pausa entre pasos (si es necesario)
+        time.sleep(3)
+        if not model.is_running:
+            break
+
+if __name__ == "__main__":
+    main()
