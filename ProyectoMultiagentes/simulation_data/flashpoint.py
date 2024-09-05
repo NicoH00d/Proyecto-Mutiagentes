@@ -649,6 +649,7 @@ for c in cells:
     # Actualizar coordenadas de puntos de interés
     if c.poi == 2:  # Víctima
         map_data[cell_key]["coordenadas_victimas"].append(c.pos)
+        map_data[cell_key]["coordenadas_poi"].append(c.pos)
     elif c.poi == 1:  # Falsa alarma
         # Solo se agrega si no hay fuego o víctimas en la misma celda
         if map_data[cell_key]["fuego"] == 0 and not map_data[cell_key]["coordenadas_victimas"]:
