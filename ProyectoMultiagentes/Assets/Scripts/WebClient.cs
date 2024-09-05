@@ -17,8 +17,6 @@ public class WebClient : MonoBehaviour
     public GameObject firefighterPrefab;
     
 
-
-    private Dictionary<Vector3, GameObject> cells = new Dictionary<Vector3, GameObject>();
     private Dictionary<int, GameObject> bomberos = new Dictionary<int, GameObject>(); // Almacenar las instancias de los bomberos
 
     private string previousJson = ""; // Variable para almacenar el JSON anterior
@@ -54,7 +52,7 @@ public class WebClient : MonoBehaviour
                         // Deserializar los datos de los bomberos
                         JObject jsonObject = JObject.Parse(newJson);
                         InstanciarBomberos(jsonObject);
-    
+                        InstanciarCeldas(jsonObject);
                         // Actualizar el JSON anterior
                         previousJson = newJson;
                     }
@@ -84,11 +82,12 @@ public class WebClient : MonoBehaviour
         {
             string cellId = entry.Key;
             Cell cell = entry.Value;
+            
 
             Vector3 cellPosition = new Vector3(currentColumn * cellSize.x, 0f, currentRow * cellSize.z);
+            
 
-            InstanciarCelda(cellPosition);
-            InstanciarMuros(cell, cellPosition, cellSize);
+            //InstanciarMuros(cell, cellPosition, cellSize);
             InstanciarPuertas(cell, cellPosition);
             InstanciarEntradas( cell, cellPosition);
             
@@ -106,6 +105,37 @@ public class WebClient : MonoBehaviour
             {
                 currentColumn = 0;
                 currentRow++;
+            }
+        }
+    }
+    void InstanciarCeldas(JObject jsonObject){
+        foreach (var cell in jsonObject){
+            if (cell.Key.StartsWith("Cell")){
+                int x = cell.Value["posicion_x"].ToObject<int>();
+                int y = cell.Value["posicion_y"].ToObject<int>();
+
+                Vector3 cellPosition = new Vector3(y-1, 0, x-1);
+                GameObject ncell = Instantiate(cellPrefab, cellPosition, Quaternion.identity);    
+                
+                // Instanciar paredes según las propiedades de muros
+                if (cell.Value["muro_arriba"].ToObject<bool>()) {
+                    // Asumiendo que el prefab de muro está orientado correctamente
+                    Instantiate(wallPrefab, cellPosition + new Vector3(0, 0.3f, -0.5f), Quaternion.Euler(0,90,0));
+                }
+                if (cell.Value["muro_izquierda"].ToObject<bool>()) {
+                    Instantiate(wallPrefab, cellPosition + new Vector3(0.5f, 0.3f, 0), Quaternion.Euler(0, 0, 0));
+                }
+                if (cell.Value["muro_abajo"].ToObject<bool>()) {
+                    Instantiate(wallPrefab, cellPosition + new Vector3(0, 0.3f, 0.5f), Quaternion.Euler(0,90,0));
+                }
+                if (cell.Value["muro_derecha"].ToObject<bool>()) {
+                    Instantiate(wallPrefab, cellPosition + new Vector3(-.5f, 0.3f, 0), Quaternion.Euler(0, 0, 0));
+                }
+                if (cell.Value["entrada"].ToObject<bool>()){
+                    Debug.Log("Instanciando puerta en la entrada");
+                    Vector3 entradaPosition = new Vector3(0, 0, 0);
+                    Instantiate(entrancePrefab, entradaPosition, Quaternion.identity);
+                }
             }
         }
     }
@@ -136,51 +166,6 @@ public class WebClient : MonoBehaviour
                 }
             }
         }
-    }
-
-    void InstanciarMuros(Cell cell, Vector3 cellPosition, Vector3 cellSize)
-    {
-        float wallHeight = 0.3f; // Ajusta la altura de las paredes si es necesario.
-
-        // Pared arriba (en la posición Z+)
-        if (cell.muro_arriba)
-        {
-            Vector3 wallPos = cellPosition + new Vector3(0, wallHeight, -cellSize.z / 2);
-            InstantiateWall(wallPrefab, wallPos, Quaternion.Euler(0, 90, 0));
-        }
-
-        // Pared derecha (en la posición X+)
-        if (cell.muro_derecha)
-        {
-            Vector3 wallPos = cellPosition + new Vector3(-cellSize.x / 2, wallHeight, 0);
-            InstantiateWall(wallPrefab, wallPos, Quaternion.identity);
-        }
-
-        // Pared abajo (en la posición Z-)
-        if (cell.muro_abajo)
-        {
-            Vector3 wallPos = cellPosition + new Vector3(0, wallHeight, cellSize.z / 2);
-            InstantiateWall(wallPrefab, wallPos, Quaternion.Euler(0, 90, 0));
-        }
-
-        // Pared izquierda (en la posición X-)
-        if (cell.muro_izquierda)
-        {
-            Vector3 wallPos = cellPosition + new Vector3(cellSize.x / 2, wallHeight, 0);
-            InstantiateWall(wallPrefab, wallPos, Quaternion.identity);
-        }
-    }
-
-    void InstantiateWall(GameObject prefab, Vector3 position, Quaternion rotation)
-    {
-        GameObject newWall = Instantiate(prefab, position, rotation);
-        // No se asigna a un objeto padre como 'floor', ya que cada muro pertenece a una celda
-    }
-
-    void InstanciarCelda(Vector3 cellPosition)
-    {
-        GameObject newCell = Instantiate(cellPrefab, cellPosition, Quaternion.identity);
-    
     }
 
     void InstanciarFuego(Cell cell, Vector3 position)
@@ -319,5 +304,5 @@ public class Bombero
     public Vector3 GetPosition()
     {
         return new Vector3(posicion_x, 0f, posicion_y); // Puedes ajustar la altura Y si es necesario
-    }
+    }
 }
