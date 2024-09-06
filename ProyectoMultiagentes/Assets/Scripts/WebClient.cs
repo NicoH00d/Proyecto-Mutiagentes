@@ -15,9 +15,11 @@ public class WebClient : MonoBehaviour
     public GameObject doorPrefab;
     public GameObject entrancePrefab;
     public GameObject firefighterPrefab;
+    public GameObject smokePrefab;
     
 
     private Dictionary<int, GameObject> bomberos = new Dictionary<int, GameObject>(); // Almacenar las instancias de los bomberos
+    private Dictionary<Vector2Int, GameObject> humoInstanciado = new Dictionary<Vector2Int, GameObject>();
 
     private string previousJson = ""; // Variable para almacenar el JSON anterior
     
@@ -135,6 +137,39 @@ public class WebClient : MonoBehaviour
                     Debug.Log("Instanciando puerta en la entrada");
                     Vector3 entradaPosition = new Vector3(0, 0, 0);
                     Instantiate(entrancePrefab, entradaPosition, Quaternion.identity);
+                }
+                if (cell.Value["coordenadas_humo"].HasValues && cell.Value["fuego"].ToObject<int>() == 1) {
+                    var coordenadasHumo = cell.Value["coordenadas_humo"].ToObject<List<List<int>>>();
+                    foreach (var coord in coordenadasHumo) {
+                        int humoX = coord[0];
+                        int humoY = coord[1];
+
+                        Vector2Int humoPos = new Vector2Int(humoX, humoY);
+                        Vector3 humoPosition = new Vector3(humoY, 0.2f, humoX);
+
+                        // Instanciar humo si no existe ya
+                        if (!humoInstanciado.ContainsKey(humoPos)) {
+                            GameObject humoObj = Instantiate(smokePrefab, humoPosition, Quaternion.Euler(-90,0,0));
+                            humoInstanciado[humoPos] = humoObj;  // Guardamos la referencia
+                        }
+                    }
+                }   
+
+                // Eliminar humo si la celda se convierte en fuego
+                if (cell.Value["fuego"].ToObject<int>() == 2) {
+                    var coordenadasHumo = cell.Value["coordenadas_humo"].ToObject<List<List<int>>>();
+                    foreach (var coord in coordenadasHumo) {
+                        int humoX = coord[0];
+                        int humoY = coord[1];
+
+                        Vector2Int humoPos = new Vector2Int(humoX, humoY);
+
+                        // Si hay humo instanciado en esa posición, eliminarlo
+                        if (humoInstanciado.ContainsKey(humoPos)) {
+                            Destroy(humoInstanciado[humoPos]);  // Eliminamos el objeto de humo
+                            humoInstanciado.Remove(humoPos);    // Eliminamos la referencia en el diccionario
+                        }
+                    }
                 }
             }
         }
