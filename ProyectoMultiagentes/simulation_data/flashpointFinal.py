@@ -14,6 +14,8 @@ Original file is located at
 #!pip install seaborn
 #!pip install IPython
 
+
+#Importar las librerías necesarias para el funcionamiento del modelo
 from mesa import Agent, Model
 from mesa.time import RandomActivation
 import json
@@ -24,27 +26,30 @@ from mesa.space import SingleGrid
 from typing import List, Tuple, Dict, Set
 import heapq
 
-# Acceder a los diferentes elementos del diccionario
-
+#Definir la clase BomberoAgent
 class BomberoAgent(Agent):
     def __init__(self, unique_id: int, model: 'FlashPointModel'):
         super().__init__(unique_id, model)
-        self.ap = 4  # Puntos de acción iniciales
-        self.max_ap = 8  # Máximo de AP acumulables
+        self.ap = 4  
+        self.max_ap = 8  
         self.position: Tuple[int, int] = (0, 0)
         self.carrying_victim = False
-        self.estrategia = "buscar_poi"  # Estrategia asignada al bombero: 'buscar_poi', 'controlar_fuego', 'quitar_humo', 'romper_pared'
+        self.estrategia = "buscar_poi"  
 
+#Definir el método step donde ejecuta la estrategia y acumula puntos de acción si es necesario
     def step(self):
         if self.estrategia:
             self.ejecutar_estrategia()
         self.acumular_ap()
 
+#Definir el método acumular_ap que acumula puntos de acción en dado caso de ser necesario
     def acumular_ap(self):
         self.ap = min(self.ap + 4, self.max_ap)
 
+#Definir el método mover que permite mover al bombero a una celda específica
     def mover(self, destino: Tuple[int, int]):
         print(f"Bombero {self.unique_id} intenta moverse hacia {destino}")
+
         # Verificar si la celda está vacía antes de mover
         if self.model.grid.is_cell_empty(destino):
             costo = 1 if not self.model.get_cell_info(destino)["fuego"] else 2
@@ -58,36 +63,42 @@ class BomberoAgent(Agent):
         else:
             print(f"Bombero {self.unique_id} no puede moverse a {destino}: la celda no está vacía.")
 
+#Definir el método mover_victima que permite mover a una víctima a una celda específica
     def mover_victima(self, destino: Tuple[int, int]):
         if self.ap >= 2:
             self.model.grid.move_agent(self, destino)
             self.ap -= 2
-
+#Definir el método rescatar_victima que permite rescatar a una víctima
     def abrir_puerta(self, pos: Tuple[int, int], direccion: str):
         if self.ap >= 2:
             self.model.set_door(pos, direccion)
             self.ap -= 2
 
+#Definir el método extinguir_fuego que permite extinguir el fuego en una celda específica
     def extinguir_fuego(self, pos: Tuple[int, int]):
         if self.ap >= 2:
             self.model.extinguish_fire(pos)
             self.ap -= 2
 
+#Definir el método destruir_pared que permite destruir una pared en una celda específica
     def destruir_pared(self, pos: Tuple[int, int], direccion: str):
         if self.ap >= 2:
             self.model.damage_wall(pos, direccion)
             self.ap -= 2
 
+#Definir el método pasar_por_obstaculo que permite pasar por un obstáculo en una celda específica
     def pasar_por_obstaculo(self, destino: Tuple[int, int]):
         if self.ap >= 1:
             self.mover(destino)
             self.ap -= 1
 
+#Definir el método quitar_humo que permite quitar el humo en una celda específica
     def quitar_humo(self, pos: Tuple[int, int]):
         if self.ap >= 1:
             self.model.clear_smoke(pos)
             self.ap -= 1
 
+#Definir la funcion ejecutar_estrategia que permite ejecutar una estrategia específica
     def ejecutar_estrategia(self):
         if self.estrategia == 'buscar_poi':
             self.estrategia_buscar_poi()
@@ -105,6 +116,7 @@ class BomberoAgent(Agent):
             self.estrategia_romper_pared()
             print("Ejecutar ROMPER")
 
+#Definir el método get_walls_info que permite obtener información sobre las paredes en una celda específica
     def get_cell_info(self, pos: Tuple[int, int]) -> Dict[str, Any]:
         """Devuelve información sobre el estado de una celda específica."""
         cell_info = {
@@ -116,9 +128,10 @@ class BomberoAgent(Agent):
         }
         return cell_info
 
-
+#Definir la funcion estrategia_buscar_poi que permite buscar un punto de interés
     def estrategia_buscar_poi(self):
         poi_posiciones = [(x, y) for (x, y), poi_info in self.model.poi_dict.items() if poi_info["is_victim"]]
+
 
         if poi_posiciones:
             destino = self.buscar_celda_cercana(poi_posiciones)
@@ -127,20 +140,16 @@ class BomberoAgent(Agent):
             if destino:
                 print(f"Bombero {self.unique_id} calcula la ruta hacia {destino}")
 
-                # Calcular la ruta usando A* a través del modelo
                 came_from, _ = self.model.a_star_search(self.position, destino)
 
-                # Verificar si el destino está en came_from
                 if destino not in came_from:
                     print(f"Error: No se encontró un camino hacia {destino}")
                     return
 
-                # Seguir el camino hacia el POI paso a paso
                 next_step = destino
                 while next_step in came_from and came_from[next_step] != self.position:
                     next_step = came_from[next_step]
 
-                # Mover al siguiente paso en el camino
                 print(f"Bombero {self.unique_id} se mueve hacia la siguiente posición {next_step}")
                 self.mover(next_step)
             else:
@@ -148,7 +157,7 @@ class BomberoAgent(Agent):
         else:
             print(f"Bombero {self.unique_id} no encontró víctimas")
 
-
+#Definir la función estrategia_controlar_fuego que permite controlar el fuego en una celda específica
     def estrategia_controlar_fuego(self):
         fuego_posiciones = [(x, y) for x in range(self.model.width)
                             for y in range(self.model.height)
@@ -158,6 +167,7 @@ class BomberoAgent(Agent):
             if destino:
                 self.extinguir_fuego(destino)
 
+#Definir la función estrategia_quitar_humo que permite quitar el humo en una celda específica
     def estrategia_quitar_humo(self):
         humo_posiciones = [(x, y) for x in range(self.model.width)
                            for y in range(self.model.height)
@@ -167,6 +177,7 @@ class BomberoAgent(Agent):
             if destino:
                 self.quitar_humo(destino)
 
+#Definir la función estrategia_romper_pared que permite romper una pared en una celda específica
     def estrategia_romper_pared(self):
         for direccion, (nx, ny) in self.get_adjacent_cells(self.position).items():
             if 0 <= nx < self.model.width and 0 <= ny < self.model.height:
@@ -178,6 +189,7 @@ class BomberoAgent(Agent):
 
         self.estrategia_buscar_poi()
 
+#Definir la función buscar_celda_cercana que permite buscar una celda cercana
     def buscar_celda_cercana(self, posiciones: list) -> Optional[Tuple[int, int]]:
         min_distancia = float('inf')
         mejor_pos = None
@@ -188,6 +200,7 @@ class BomberoAgent(Agent):
                 mejor_pos = pos
         return mejor_pos
 
+#Definir la función get_adjacent_cells que permite obtener las celdas adyacentes a una celda específica
     def get_adjacent_cells(self, pos: Tuple[int, int]) -> dict:
         x, y = pos
         return {
@@ -198,7 +211,7 @@ class BomberoAgent(Agent):
         }
 
 
-
+#Definir la clase FlashPointModel nucleo del modelo
 class FlashPointModel(Model):
     def __init__(self,width, height, wall_matrix, pois, initial_fire_positions, door_connections, exit_points, map_data, num_firefighters: int = 6):
         super().__init__()
@@ -223,10 +236,8 @@ class FlashPointModel(Model):
         self.exit_areas = set(exit_points)
         self.map_data = map_data
 
-        # Preparar el tablero de juego
         self.setup_grid(wall_matrix)
         self.deploy_agents(num_firefighters)
-        #self.place_victims(victim_positions)
         self.setup_fire(initial_fire_positions)
         for (x, y, state) in pois:
             if state == 'v':  # Si es víctima
@@ -234,7 +245,7 @@ class FlashPointModel(Model):
             elif state == 'f':  # Si es falsa alarma
                 self.poi_dict[(int(x), int(y))] = {"is_victim": False, "revealed": False}
 
-            
+#Definir el método get_cell_info que permite obtener información de una celda específica     
     def get_cell_info(self, pos: Tuple[int, int]) -> Dict[str, bool]:
         """Devuelve la información de una celda en la cuadrícula."""
         cell_info = {
@@ -245,7 +256,6 @@ class FlashPointModel(Model):
         if pos in self.poi_dict:
             cell_info["revealed"] = self.poi_dict[pos]["revealed"]
             cell_info["is_victim"] = self.poi_dict[pos]["is_victim"]
-        #print(f"Info de la celda {pos}: {cell_info}")
         return cell_info
     
     def heuristic(self, a, b):
@@ -269,7 +279,6 @@ class FlashPointModel(Model):
             if current == goal:
                 break
 
-            # Obtener vecinos de la posición actual
             neighbors = self.grid.get_neighbors(current, moore=False, include_center=False, radius=1)
             for next in neighbors:
                 new_cost = cost_so_far[current] + 1  # Asumiendo que cada movimiento tiene un costo de 1
@@ -281,16 +290,18 @@ class FlashPointModel(Model):
 
         return came_from, cost_so_far
 
+#Definir el método get_neighbors que permite obtener las celdas vecinas a una celda específica
     def get_neighbors(self, pos):
         """Devuelve las celdas vecinas a las que el bombero puede moverse."""
         return self.grid.get_neighbors(pos, moore=False, include_center=False, radius=1)
 
+#Definir la funcion setup_grid que permite preparar la cuadrícula
     def setup_grid(self, wall_matrix: List[str]) -> None:
         """Prepara la estructura de la cuadrícula, asignando las paredes y las puertas."""
         self.grid_connections = self.create_grid_structure(self.width, self.height, wall_matrix)
         self.convert_walls_to_doors(self.grid_connections, self.doorways)
 
-
+#Definir la función create_grid_structure que permite crear la estructura de la cuadrícula
     def create_grid_structure(self, width: int, height: int, wall_matrix: List[str]) -> Dict[Tuple[int, int], List[Tuple[Tuple[int, int], int]]]:
         """Genera la estructura de la cuadrícula basada en el esquema de paredes."""
         grid_structure = {}
@@ -303,7 +314,6 @@ class FlashPointModel(Model):
 
                 wall_info = wall_matrix[y][x]
 
-                # Verifica si wall_info tiene 4 caracteres
                 if len(wall_info) != 4:
                     raise ValueError(f"wall_info en la posición {x}, {y} no tiene 4 caracteres: {wall_info}")
 
@@ -320,25 +330,22 @@ class FlashPointModel(Model):
         print(grid_structure.keys())
         return grid_structure
     
+#Definir la función convert_walls_to_doors que permite convertir las paredes en puertas
     def convert_walls_to_doors(self, grid_structure: Dict[Tuple[int, int], List[Tuple[Tuple[int, int], int]]],
                                door_positions: List[Tuple[Tuple[int, int], Tuple[int, int]]]) -> None:
-        # Filtra las posiciones de puertas que están fuera de los límites de la cuadrícula
         valid_door_positions = [
             (cell1, cell2) for (cell1, cell2) in door_positions
-            # Convertir las coordenadas de cell1 y cell2 a enteros antes de la comparación
             if (0 <= int(cell1[0]) < self.width and 0 <= int(cell1[1]) < self.height) and
                (0 <= int(cell2[0]) < self.width and 0 <= int(cell2[1]) < self.height)
         ]
 
         for cell1, cell2 in valid_door_positions:
-            # Convertir las coordenadas a enteros antes de pasar a las siguientes funciones
             cell1 = (int(cell1[0]), int(cell1[1]))
             cell2 = (int(cell2[0]), int(cell2[1]))
             self.update_travel_cost(grid_structure, cell1, cell2, 2)
             self.update_travel_cost(grid_structure, cell2, cell1, 2)
 
-
-
+#Definir la funcion update_travel_cost que permite actualizar el costo de movimiento entre dos celdas
     def update_travel_cost(self, grid_structure: Dict[Tuple[int, int], List[Tuple[Tuple[int, int], int]]],
                            from_pos: Tuple[int, int], to_pos: Tuple[int, int], new_cost: int) -> None:
         """Actualiza el costo de movimiento entre dos celdas en la cuadrícula."""
@@ -347,6 +354,7 @@ class FlashPointModel(Model):
                 grid_structure[from_pos][i] = (adj, new_cost)
                 break
 
+#Definir la funcion deploy_agents que permite desplegar a los agentes en la cuadrícula
     def deploy_agents(self, num_firefighters: int) -> None:
         """Despliega a los agentes bomberos en posiciones aleatorias y los coloca en la cuadrícula."""
         for i in range(num_firefighters):
@@ -360,18 +368,20 @@ class FlashPointModel(Model):
             self.schedule.add(firefighter)
             self.agents.append(firefighter)
 
+#Definir la función place_victims que permite colocar a las víctimas en la cuadrícula
     def place_victims(self, victim_positions: List[Tuple[int, int, bool]]) -> None:
         """Coloca las víctimas en las posiciones iniciales en la cuadrícula."""
         for pos_x, pos_y, is_victim in victim_positions:
             pos = (pos_x, pos_y)
             self.poi_dict[pos] = {"is_victim": is_victim, "revealed": False}
 
-
+#Definir la función setup_fire que permite colocar las posiciones iniciales de fuego en la cuadrícula
     def setup_fire(self, fire_positions: List[Tuple[int, int]]) -> None:
         """Coloca las posiciones iniciales de fuego en la cuadrícula."""
         for pos in fire_positions:
             self.fire_spots.add(pos)
 
+#Definir la funcion advance_simulation que permite avanzar un paso en la simulación
     def advance_simulation(self):
         """Avanza un paso en la simulación."""
         if self.is_running:
@@ -379,21 +389,22 @@ class FlashPointModel(Model):
             
             for agent in self.schedule.agents:
                 if isinstance(agent, BomberoAgent):
-                    agent.ap = 4 # Si es un agente Bombero
-                    agent.ejecutar_estrategia()  # Llama a su método ejecutar_estrategia
+                    agent.ap = 4 
+                    agent.ejecutar_estrategia()  
             
             self.schedule.step()
             self.evaluate_game_over_conditions()
             self.simulation_step += 1
             print("avanzar")
 
+#Definir la función spread_fire que permite propagar el fuego en la cuadrícula
     def spread_fire(self) -> None:
         """Gestiona la propagación del fuego, convirtiendo humo en fuego y manejando explosiones."""    
         fire_roll = (self.random.randrange(0, self.width), self.random.randrange(0, self.height))
         self.add_smoke_or_fire(fire_roll)
-        self.trigger_flashover()
-        
+        self.trigger_flashover()   
     
+#Definir la función add_smoke_or_fire que permite agregar humo o fuego en una celda específica
     def add_smoke_or_fire(self, pos):
         """Agrega humo a una celda, o lo convierte en fuego si ya tiene humo, evitando agregar fuego si ya existe."""
         cell_key = f"Cell {pos[0]+1}{pos[1]+1}"
@@ -403,27 +414,24 @@ class FlashPointModel(Model):
             print(f"No se encontró la celda {cell_key} en map_data")
             return
 
-        # Si ya hay fuego, no hacer nada
         if cell["fuego"] == 2:
             print(f"Ya hay fuego en {cell_key}, no se puede agregar más humo o fuego.")
             return
 
         if cell["fuego"] == 0:
-            # Si no hay fuego ni humo, agregamos humo (fuego = 1)
             cell["fuego"] = 1
-            if [pos[0], pos[1]] not in cell["coordenadas_humo"]:  # Verifica si las coordenadas ya están
-                cell["coordenadas_humo"].append([pos[0], pos[1]])  # Capturamos la posición del humo
+            if [pos[0], pos[1]] not in cell["coordenadas_humo"]: 
+                cell["coordenadas_humo"].append([pos[0], pos[1]])  
             print(f"Humo agregado en {cell_key}")
         elif cell["fuego"] == 1:
-            # Si ya hay humo, lo convertimos en fuego (fuego = 2)
+            
             cell["fuego"] = 2
-            cell["coordenadas_humo"].clear()  # Eliminamos la referencia al humo
-            if [pos[0], pos[1]] not in cell["coordenadas_fuego"]:  # Verifica si las coordenadas ya están
-                cell["coordenadas_fuego"].append([pos[0], pos[1]])  # Agregamos la posición del fuego
+            cell["coordenadas_humo"].clear()  
+            if [pos[0], pos[1]] not in cell["coordenadas_fuego"]:  
+                cell["coordenadas_fuego"].append([pos[0], pos[1]]) 
             print(f"Fuego en {cell_key}")
 
-
-    
+#Definir la función trigger_flashover que permite simular el fenómeno de flashover
     def trigger_flashover(self):
         """Simula el fenómeno de flashover donde el fuego se propaga a las celdas adyacentes."""
         for pos in list(self.fire_spots):
@@ -433,12 +441,12 @@ class FlashPointModel(Model):
                 cell = self.map_data.get(cell_key)
 
                 if cell and cell["fuego"] == 1:
-                    # Convertir humo en fuego si hay fuego adyacente
                     cell["fuego"] = 2
                     cell["coordenadas_fuego"].append([neighbor[0], neighbor[1]])
-                    cell["coordenadas_humo"].clear()  # Limpia el humo al convertirlo en fuego
+                    cell["coordenadas_humo"].clear()  
                     print(f"Flashover! El fuego se propagó a {cell_key}")
 
+#Definir funcion turn_smoke_into_fire que permite convertir el humo en fuego en una celda específica
     def turn_smoke_into_fire(self, pos: Tuple[int, int]) -> None:
         """Convierte el humo en fuego en una posición específica."""
         self.smoke_spots.remove(pos)
@@ -446,6 +454,7 @@ class FlashPointModel(Model):
         if pos in self.poi_dict:
             self.lose_victim(pos)
 
+#Definir funcion handle_explosion que permite manejar una explosión en una celda específica
     def handle_explosion(self, pos: Tuple[int, int]) -> None:
         directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Norte, Sur, Oeste, Este
 
@@ -463,7 +472,7 @@ class FlashPointModel(Model):
 
                 if current_fire_state == 0:
                     # Si la celda está vacía, agregar fuego
-                    cell["fuego"] = 2  # 2 representa fuego
+                    cell["fuego"] = 2  
                     cell["coordenadas_fuego"] = [list(adjacent_pos)]
                     print(f"El fuego se ha propagado a {adjacent_pos} debido a la explosión.")
                 elif current_fire_state == 1:
@@ -471,14 +480,14 @@ class FlashPointModel(Model):
                     cell["fuego"] = 2
                     cell["coordenadas_fuego"] = [list(adjacent_pos)]
                     print(f"El humo en {adjacent_pos} se ha convertido en fuego debido a la explosión.")
-                # Si la celda ya tiene fuego, no hacemos nada adicional
 
+#Definir funcion update_fire_in_json que permite actualizar el estado del fuego en el archivo JSON
     def update_fire_in_json(self) -> None:
         """Actualiza el archivo JSON con el estado actual del fuego en el mapa."""
-        # Guardar el estado actualizado del mapa en el archivo JSON
         self.save_json(self.map_data)
         print("Estado del fuego actualizado en el archivo JSON.")
 
+#Definir funcion place_fire_or_switch_smoke que permite colocar fuego o convertir humo en fuego en una celda específica
     def place_fire_or_switch_smoke(self, pos: Tuple[int, int]) -> None:
         """Coloca fuego o convierte humo en fuego en una posición específica."""
         if pos in self.smoke_spots:
@@ -488,8 +497,8 @@ class FlashPointModel(Model):
             if pos in self.poi_dict:
                 self.lose_victim(pos)
 
+#Definir funcion shockwave que permite propagar una onda expansiva en una dirección específica
     def trigger_shockwave(self, start_pos: Tuple[int, int], direction: Tuple[int, int]) -> None:
-        """Propaga la onda expansiva de una explosión, afectando las celdas en la dirección dada."""
         current_pos = start_pos
         while True:
             next_pos = (current_pos[0] + direction[0], current_pos[1] + direction[1])
@@ -509,8 +518,8 @@ class FlashPointModel(Model):
                     break
             current_pos = next_pos
 
+#Definir funcion flashover que permite simular el fenómeno de flashover
     def trigger_flashover(self) -> None:
-        """Simula el fenómeno del flashover, donde el fuego se propaga al humo adyacente."""
         flashover_occurred = True
         while flashover_occurred:
             flashover_occurred = False
@@ -519,15 +528,15 @@ class FlashPointModel(Model):
                     self.turn_smoke_into_fire(smoke_pos)
                     flashover_occurred = True
 
+#Definir lose_victim que permite perder una víctima en una celda específica
     def lose_victim(self, pos: Tuple[int, int]) -> None:
-        """Gestiona la pérdida de una víctima en una posición específica."""
-        if pos in self.poi_dict:
+        if pos in self.poFi_dict:
             if self.poi_dict[pos]["is_victim"] and not self.poi_dict[pos]["revealed"]:
                 self.lost_victims += 1
             del self.poi_dict[pos]
 
+#Definir evaluate_game_over_conditions que permite evaluar las condiciones de fin de juego
     def evaluate_game_over_conditions(self) -> None:
-        """Evalúa si se ha alcanzado una condición de fin de juego."""
         if self.damage_markers >= self.max_damage_threshold:
             self.is_running = False
             print("Fin del Juego: El edificio ha colapsado.")
@@ -541,29 +550,26 @@ class FlashPointModel(Model):
             self.is_running = False
             print("Fin del Juego: No quedan más bomberos.")
 
+#Definir is_valid_position que permite verificar si una posición es válida
     def is_valid_position(self, pos: Tuple[int, int]) -> bool:
-        """Comprueba si una posición está dentro de los límites de la cuadrícula."""
         return 0 <= pos[0] < self.width and 0 <= pos[1] < self.height
 
     def is_adjacent(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> bool:
-        """Determina si dos posiciones son adyacentes en la cuadrícula."""
-        # posiciones son enteros
         pos1 = (int(pos1[0]), int(pos1[1]))
         pos2 = (int(pos2[0]), int(pos2[1]))
 
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1]) == 1
 
-
+#Definir is_wall_between que permite verificar si hay una pared entre dos celdas
     def is_wall_between(self, pos: Tuple[int, int], adj_pos: Tuple[int, int]) -> bool:
-        """Comprueba si hay una pared entre dos celdas adyacentes."""
         return any(adj == adj_pos and cost == 5 for adj, cost in self.grid_connections.get(pos, []))
 
+#Definir is_door_between que permite verificar si hay una puerta entre dos celdas
     def is_door_between(self, pos: Tuple[int, int], adj_pos: Tuple[int, int]) -> bool:
-        """Comprueba si hay una puerta entre dos celdas adyacentes."""
         return any(adj == adj_pos and cost == 2 for adj, cost in self.grid_connections.get(pos, []))
 
+#Definir weaken_wall que permite debilitar una pared entre dos celdas
     def weaken_wall(self, pos: Tuple[int, int], adj_pos: Tuple[int, int]) -> None:
-        """Debilita una pared entre dos celdas, eventualmente destruyéndola."""
         if self.is_wall_between(pos, adj_pos):
             wall_key = (pos, adj_pos) if (pos, adj_pos) in self.wall_durability else (adj_pos, pos)
             self.wall_durability[wall_key] -= 1
@@ -574,14 +580,14 @@ class FlashPointModel(Model):
                 del self.wall_durability[wall_key]
                 print(f"La pared entre {pos} y {adj_pos} ha sido destruida.")
 
+#Definir weaken_door que permite debilitar una puerta entre dos celdas
     def weaken_door(self, pos: Tuple[int, int], adj_pos: Tuple[int, int]) -> None:
-        """Debilita una puerta entre dos celdas, eventualmente convirtiéndola en un camino abierto."""
         if self.is_door_between(pos, adj_pos):
             self.update_travel_cost(self.grid_connections, pos, adj_pos, 1)
             self.update_travel_cost(self.grid_connections, adj_pos, pos, 1)
 
+#Definir get_simulation_state que permite obtener el estado de la simulación
     def get_simulation_state(self) -> Dict:
-        """Devuelve el estado actual de la simulación."""
         return {
             "step": self.simulation_step,
             "grid_connections": self.grid_connections,
@@ -595,36 +601,33 @@ class FlashPointModel(Model):
             "firefighter_positions": [{"id": agent.unique_id, "position": agent.position, "carrying_victim": agent.carrying_victim} for agent in self.agents if isinstance(agent, BomberoAgent)]
         }
         
-        
-        
-        
-
 import json
 import time
 
 def save_json(map_data):
-    # Guarda el JSON en un archivo (sobrescribiendo en cada paso)
     with open('simulation_state.json', 'w') as outfile:
         json.dump(map_data, outfile)
     print("Estado del mapa guardado en simulation_state.json")
 
 def main():
-    
     class Cell():
         def __init__(self, x, y, wall):
+            # posición
             self.pos = (x, y)
+    
             self.up = wall[0] == '1'
             self.left = wall[1] == '1'
             self.down = wall[2] == '1'
             self.right = wall[3] == '1'
+    
             self.poi = 0
+    
             self.fire = 0
+    
             self.door = []
     
-
-            self.entrance = False #Entrada
+            self.entrance = False
     
-
     with open('tablero.txt', 'r') as map_file:
         text = map_file.read().splitlines()
     
@@ -637,6 +640,7 @@ def main():
 
     print(f"Dimensiones de wall_matrix: {len(wall_matrix)} filas, cada fila tiene {len(wall_matrix[0])} columnas")
 
+    
     pois = []
     for line in text[6:9]:
         pos_poi_x = line[0]
@@ -657,7 +661,7 @@ def main():
         pos_doorB_x = line[4]
         pos_doorB_y = line[6]
         doors.append(((pos_doorA_x, pos_doorA_y), (pos_doorB_x, pos_doorB_y)))
-
+    
     entrances = []
     for line in text[27:]:
         pos_entrance_x = line[0]
@@ -685,8 +689,7 @@ def main():
     
             if (str(i + 1), str(j + 1)) in entrances:
                 c.entrance = True
-    
-    map_data = {}
+        map_data = {}
     
     for c in cells:
         cell_key = f"Cell {c.pos[0]}{c.pos[1]}"
@@ -710,14 +713,14 @@ def main():
                 "coordenadas_humo":[]
             }
         
-        if c.poi == 2:
+        if c.poi == 2: 
             map_data[cell_key]["coordenadas_victimas"].append(c.pos)
             map_data[cell_key]["coordenadas_poi"].append(c.pos)
         elif c.poi == 1:  
             if map_data[cell_key]["fuego"] == 0 and not map_data[cell_key]["coordenadas_victimas"]:
                 map_data[cell_key]["coordenadas_poi"].append(c.pos)
         
-        if c.fire == 2:
+        if c.fire == 2: 
             map_data[cell_key]["coordenadas_fuego"].append(c.pos)
         
         if c.entrance:
@@ -725,7 +728,6 @@ def main():
     
     GRID_WIDTH = 8
     GRID_HEIGHT = 6
-    # Inicializar el modelo con los datos extraídos
     print("paredes ", walls2)
 
     model = FlashPointModel(GRID_WIDTH, GRID_HEIGHT, wall_matrix, pois, fires, doors, entrances, map_data)
