@@ -297,10 +297,6 @@ public class WebClient : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
-    {
-        // Aquí puedes actualizar el estado del mapa si es necesario.
-    }
 }
 
 // Clase Cell que contiene la información de cada celda.
