@@ -547,7 +547,7 @@ class FlashPointModel(Model):
 
     def is_adjacent(self, pos1: Tuple[int, int], pos2: Tuple[int, int]) -> bool:
         """Determina si dos posiciones son adyacentes en la cuadrícula."""
-        # Asegúrate de que las posiciones son enteros
+        # posiciones son enteros
         pos1 = (int(pos1[0]), int(pos1[1]))
         pos2 = (int(pos2[0]), int(pos2[1]))
 
@@ -609,35 +609,25 @@ def save_json(map_data):
     print("Estado del mapa guardado en simulation_state.json")
 
 def main():
-    # Clase Cell que nos ayuda a guardar información
+    
     class Cell():
         def __init__(self, x, y, wall):
-            # posición
             self.pos = (x, y)
-    
-            # valor de los muros
             self.up = wall[0] == '1'
             self.left = wall[1] == '1'
             self.down = wall[2] == '1'
             self.right = wall[3] == '1'
-    
-            # valor de los puntos de interés 1 si es falsa alarma, 2 si es una víctima
             self.poi = 0
-    
-            # valor del fuego 1 si es humo, 2 si es fuego
             self.fire = 0
-    
-            # arreglo con la posición de la casilla donde se conecta con puerta
             self.door = []
     
-            # True si la casilla es una entrada a la estructura
-            self.entrance = False
+
+            self.entrance = False #Entrada
     
-    # Abrimos el archivo txt
+
     with open('tablero.txt', 'r') as map_file:
         text = map_file.read().splitlines()
     
-    # Obtenemos los valores de los muros
     walls = []
     for line in text[:6]:
         wall_segments = line.split()
@@ -647,8 +637,6 @@ def main():
 
     print(f"Dimensiones de wall_matrix: {len(wall_matrix)} filas, cada fila tiene {len(wall_matrix[0])} columnas")
 
-    
-    # Obtenemos los valores de los puntos de interés (POI)
     pois = []
     for line in text[6:9]:
         pos_poi_x = line[0]
@@ -656,14 +644,12 @@ def main():
         pos_poi_state = line[4]
         pois.append((pos_poi_x, pos_poi_y, pos_poi_state))
     
-    # Obtenemos los valores del fuego
     fires = []
     for line in text[9:19]:
         pos_fire_x = line[0]
         pos_fire_y = line[2]
         fires.append((pos_fire_x, pos_fire_y))
     
-    # Obtenemos las casillas que están conectadas por una puerta
     doors = []
     for line in text[19:27]:
         pos_doorA_x = line[0]
@@ -671,15 +657,13 @@ def main():
         pos_doorB_x = line[4]
         pos_doorB_y = line[6]
         doors.append(((pos_doorA_x, pos_doorA_y), (pos_doorB_x, pos_doorB_y)))
-    
-    # Obtenemos las posiciones de las entradas
+
     entrances = []
     for line in text[27:]:
         pos_entrance_x = line[0]
         pos_entrance_y = line[2]
         entrances.append((pos_entrance_x, pos_entrance_y))
         
-    # Inicializamos las celdas
     cells = []
     for i in range(6):
         for j in range(8):
@@ -702,7 +686,6 @@ def main():
             if (str(i + 1), str(j + 1)) in entrances:
                 c.entrance = True
     
-    # Diccionario con la composición inicial de celdas
     map_data = {}
     
     for c in cells:
@@ -727,20 +710,16 @@ def main():
                 "coordenadas_humo":[]
             }
         
-        # Actualizar coordenadas de puntos de interés
-        if c.poi == 2:  # Víctima
+        if c.poi == 2:
             map_data[cell_key]["coordenadas_victimas"].append(c.pos)
             map_data[cell_key]["coordenadas_poi"].append(c.pos)
-        elif c.poi == 1:  # Falsa alarma
-            # Solo se agrega si no hay fuego o víctimas en la misma celda
+        elif c.poi == 1:  
             if map_data[cell_key]["fuego"] == 0 and not map_data[cell_key]["coordenadas_victimas"]:
                 map_data[cell_key]["coordenadas_poi"].append(c.pos)
         
-        # Actualizar coordenadas de fuego
-        if c.fire == 2:  # Fuego
+        if c.fire == 2:
             map_data[cell_key]["coordenadas_fuego"].append(c.pos)
         
-        # Actualizar coordenadas de entradas
         if c.entrance:
             map_data[cell_key]["coordenadas_entradas"].append(c.pos)
     
